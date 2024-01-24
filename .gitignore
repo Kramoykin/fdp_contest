@@ -21,6 +21,7 @@ site_build
 docs.zip
 archive.zip
 
+back/fdp_contest/data/*
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
