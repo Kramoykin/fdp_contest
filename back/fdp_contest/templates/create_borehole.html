@@ -1,0 +1,29 @@
+<html>
+<head>
+    <title>Создать Скважину</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <form action="http://127.0.0.1:8000/borehole" method="POST">
+        <div>
+            <label for="team_name">Имя команды:</label>
+            <input type="text" id="team_name" name="team_name" />
+        </div>
+        
+        <div>
+            <label for="password">Пароль:</label>
+            <input type="text" id="password" name="password" />
+        </div>
+        
+        <div>
+            <label for="md">Глубина начала бурения:</label>
+            <input type="text" id="md" name="md" />
+        </div>
+
+        <div>
+            <button>Отправить</button>
+        </div>
+        <!-- <input type="file" id="avatar" name="avatar" accept="image/png, image/jpeg" /> -->
+    </form>
+</body>
+</html>

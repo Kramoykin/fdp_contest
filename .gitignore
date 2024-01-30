@@ -29,6 +29,8 @@ back/fdp_contest/data/*
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 
+*.db
+
 # Local History for Visual Studio Code
 .history/
 
