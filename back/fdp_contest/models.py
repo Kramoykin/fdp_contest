@@ -11,3 +11,4 @@ class Team(Base):
     name = Column(String, unique=True, index=True)
     password = Column(String, unique=True)
     bit_current_position = Column(Double, default=0.0) # текущее положение долота в метрах
+    borehole_count = Column(Integer, default = 0)
