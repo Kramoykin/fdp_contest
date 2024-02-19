@@ -31,6 +31,8 @@ back/fdp_contest/data/*
 
 *.db
 
+data/
+
 # Local History for Visual Studio Code
 .history/
 

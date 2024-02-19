@@ -10,7 +10,14 @@ class Team(TeamBase):
     id: int
     name: str
     password: str
-    bit_current_position: float
 
     class Config:
         orm_mode = True
+
+class BoreholeBase(BaseModel):
+    name: str
+
+class BoreholeCreate(BoreholeBase):
+    file_path: str
+    team_id: int
+    bit_current_position: float
