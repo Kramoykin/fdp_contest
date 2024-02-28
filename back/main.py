@@ -1,7 +1,7 @@
 from typing import Annotated
 import pandas as pd
 import lasio 
-import aiofiles
+import os
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -68,7 +68,6 @@ def create_team(secret: str, team: schema.TeamCreate, db: Session = Depends(get_
 async def upload(request: Request,
                  db: Session = Depends(get_db)):
     body_validator = MaxBodySizeValidator(MAX_REQUEST_BODY_SIZE)
-    filename = request.headers.get('Filename')
     
     if (request.query_params["secret"] != ADMIN_SECRET):
         raise HTTPException(status_code=403, detail="Недостаточно полномочий")
@@ -77,14 +76,9 @@ async def upload(request: Request,
     if not db_team:
         raise HTTPException(status_code=400, detail="Нет такой команды")
     
-    if request.query_params["password"] != db_team.password:
-        raise HTTPException(status_code=401, detail="Неправильный пароль")
-    
-    if not filename:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
-            detail='Filename header is missing')
     try:
         filepath = f"data/grids/{db_team.name}.csv"
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         file_ = FileTarget(filepath, validator=MaxSizeValidator(MAX_FILE_SIZE))
         data = ValueTarget()
         parser = StreamingFormDataParser(headers=request.headers)
@@ -114,7 +108,7 @@ async def upload(request: Request,
 
     print(file_.multipart_filename)
         
-    return {"message": f"Successfuly uploaded {filename}"}
+    return {"message": f"Successfuly uploaded {filepath}"}
 
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
@@ -126,7 +120,7 @@ async def read_item(request: Request):
 async def upload_borehole(team_name: Annotated[str, Form()]
                         , password: Annotated[str, Form()]
                         , borehole_name: Annotated[str, Form()]
-                        , bit_current_position: Annotated[float, Form()]
+                        , md: Annotated[float, Form()]
                         , file: Annotated[UploadFile, File()]
                         , db: Session = Depends(get_db)):
     db_team = crud.get_team_by_name(db, name=team_name)
@@ -146,12 +140,13 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     if len(db_team.boreholes) > 9:
         raise HTTPException(status_code=409, detail="Превышен лимит числа скважин для команды")
 
-    file_path = f"data/teams/{file.filename}_{db_team.name}_{len(db_team.boreholes) + 1}"
+    file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}_{len(db_team.boreholes) + 1}"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "wb+") as file_object:
         file_object.write(file.file.read())
 
     bh_create = schema.BoreholeCreate(name = borehole_name
-                                    , bit_current_position = bit_current_position
+                                    , bit_current_position = md
                                     , file_path = file_path
                                     , team_id = db_team.id)
     db_borehole = crud.create_borehole(db, bh_create)
@@ -164,6 +159,8 @@ async def upload_borehole(team_name: Annotated[str, Form()]
 async def download_logging(
                     team_name: Annotated[str, Form()]
                   , password: Annotated[str, Form()]
+                  , borehole_name: Annotated[str, Form()]
+                  , md: Annotated[float, Form()]
                   , db: Session = Depends(get_db)):
     db_team = crud.get_team_by_name(db, name=team_name)
     if not db_team:
@@ -172,10 +169,21 @@ async def download_logging(
     if password != db_team.password:
         raise HTTPException(status_code=401, detail="Неправильный пароль")
     
-    file_path = f"data/teams/Скважина_2_{db_team.name}_{db_team.borehole_count}"
-    traj_df = utils.get_trajectory_df(file_path)
+    boreholes = [bh for bh in db_team.boreholes if bh.name == borehole_name]
+    if (len(boreholes) == 0):
+        raise HTTPException(status_code=400, detail="Нет скважины с таким именем")
+    borehole_db = boreholes[0]
 
-    grid_df = pd.read_csv('data/grid.csv')
+    traj_df = utils.get_trajectory_df(borehole_db.file_path)
+
+    borehole_length_MD = traj_df['MD'].values[-1]
+    if (md > borehole_length_MD):
+        raise HTTPException(status_code=400, detail="значение md не может превышать длину скважины")
+
+    incremented_bit_position = borehole_db.bit_current_position + md
+    traj_df = traj_df[traj_df["MD"] <= incremented_bit_position]
+
+    grid_df = pd.read_csv(f"data/grids/{db_team.name}.csv")
 
     indices = utils.find_closest_indices_xyz(target_coords=traj_df[['X', 'Y', 'Z']].to_numpy(), 
                                    coords=grid_df[['X_UTME', 'Y_UTMN', 'Z_TVDSS']].to_numpy()
@@ -186,8 +194,23 @@ async def download_logging(
     las = lasio.LASFile()
     las.insert_curve(0, "DEPT", traj_df['MD'], unit="m", descr="Depth")
     las.insert_curve(1, "GR", curve, unit="API", descr="Gamma Ray")
-    logging_file_path = f"data/teams/{db_team.name}_gamma_ray_curve.las"
+    logging_file_path = f"data/teams/{db_team.name}/loggings/{borehole_db.name}.las"
+    os.makedirs(os.path.dirname(logging_file_path), exist_ok=True)
     with open(logging_file_path, 'w+') as fobj:
         las.write(fobj, version=2.0)
 
-    return FileResponse(logging_file_path, filename=f"{db_team.name}_output.las", media_type="application/octet-stream")
+    logging = borehole_db.logging
+    if (logging == None):
+        logging = schema.Logging(borehole_id = borehole_db.id
+                               , file_path = logging_file_path)
+        crud.create_logging(db, logging)
+    borehole_db.bit_current_position = incremented_bit_position
+    db.commit()
+
+    return FileResponse(logging_file_path, filename=f"{db_team.name}_{borehole_db.name}_output.las", media_type="application/octet-stream")
+
+@app.get("/logging", response_class=HTMLResponse)
+async def read_item(request: Request):
+    return templates.TemplateResponse(
+        request=request, name="download_logging.html"
+    )

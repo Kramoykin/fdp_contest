@@ -13,6 +13,14 @@ def create_team(db: Session, team: schema.TeamCreate):
     db.refresh(db_team)
     return db_team
 
+def create_logging(db: Session, logging: schema.Logging):
+    db_logging = models.Logging(borehole_id = logging.borehole_id
+                              , file_path = logging.file_path)
+    db.add(db_logging)
+    db.commit()
+    db.refresh(db_logging)
+    return db_logging
+
 def create_borehole(db: Session, 
                     bh: schema.BoreholeCreate):
     db_borehole = models.Borehole(name = bh.name
@@ -23,3 +31,10 @@ def create_borehole(db: Session,
     db.commit()
     db.refresh(db_borehole)
     return db_borehole
+
+def get_team_borehole_by_name(db: Session
+                            , team_name: str
+                            , borehole_name: str):
+    
+    return db.query(models.Borehole).filter(models.Borehole.team.name == team_name \
+                                        and models.Borehole.name == borehole_name).first()

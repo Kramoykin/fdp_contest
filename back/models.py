@@ -23,11 +23,20 @@ class Borehole(Base):
     __tablename__ = "boreholes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(unique=True, index=True)
+    name: Mapped[str] = mapped_column()
     file_path: Mapped[str] = mapped_column(unique=True)
     bit_current_position: Mapped[float] = mapped_column(default=0.0) # текущее положение долота в метрах
+
+    logging: Mapped["Logging"] = relationship("Logging", uselist=False, back_populates="borehole")
 
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
     team: Mapped["Team"] = relationship(back_populates="boreholes")
 
+class Logging(Base):
+    __tablename__ = "loggings"
 
+    id: Mapped[int] = mapped_column(primary_key=True)
+    file_path: Mapped[str] = mapped_column(unique=True)
+
+    borehole_id: Mapped[int] = mapped_column(ForeignKey("boreholes.id"))
+    borehole: Mapped["Borehole"] = relationship(back_populates="logging")
