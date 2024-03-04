@@ -133,10 +133,23 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     if file.size < 100 or file.size > 1000000:
         raise HTTPException(status_code=400, detail=" Неподходящий размер файла")
     
-    same_name_boreholes = [b for b in db_team.boreholes if b.name == borehole_name]
-    if (same_name_boreholes):
-        raise HTTPException(status_code=400, detail="Уже есть скважина с таким именем")
-    
+    same_name_boreholes = set([b for b in db_team.boreholes if b.name == borehole_name])
+    if (len(same_name_boreholes) == 1):
+        existing_borehole = same_name_boreholes.pop()
+        file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}_{len(db_team.boreholes)}"
+
+        if (md < existing_borehole.bit_current_position):
+            raise HTTPException(status_code=400, detail="Глубина бурения для новой траектории не может быть меньше текущей")
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "wb+") as file_object:
+            file_object.write(file.file.read())
+
+        existing_borehole.bit_current_position = md
+        db.commit()
+
+        return {"existing_borehole": existing_borehole.name}
+
     if len(db_team.boreholes) > 9:
         raise HTTPException(status_code=409, detail="Превышен лимит числа скважин для команды")
 
@@ -152,7 +165,7 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     db_borehole = crud.create_borehole(db, bh_create)
     db_team.boreholes.append(db_borehole)
 
-    return {"borehole": db_borehole.id}
+    return {"borehole": db_borehole.name}
 
 
 @app.post("/logging", response_class=Response)
