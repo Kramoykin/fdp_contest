@@ -4,6 +4,7 @@ from sqlalchemy import Double, Column, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
+from datetime import datetime
 
 
 from database import Base
@@ -26,6 +27,7 @@ class Borehole(Base):
     name: Mapped[str] = mapped_column()
     file_path: Mapped[str] = mapped_column(unique=True)
     bit_current_position: Mapped[float] = mapped_column(default=0.0) # текущее положение долота в метрах
+    creation_date: Mapped[datetime] = mapped_column()
 
     logging: Mapped["Logging"] = relationship("Logging", uselist=False, back_populates="borehole")
 

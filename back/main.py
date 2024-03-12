@@ -2,6 +2,7 @@ from typing import Annotated
 import pandas as pd
 import lasio 
 import os
+from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -99,7 +100,8 @@ async def upload(request: Request,
     except streaming_form_data.validators.ValidationError:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, 
             detail=f'Maximum file size limit ({MAX_FILE_SIZE} bytes) exceeded') 
-    except Exception:
+    except Exception as e:
+        print(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail='There was an error uploading the file') 
    
@@ -145,12 +147,11 @@ async def upload_borehole(team_name: Annotated[str, Form()]
         with open(file_path, "wb+") as file_object:
             file_object.write(file.file.read())
 
-        existing_borehole.bit_current_position = md
-        db.commit()
-
         return {"existing_borehole": existing_borehole.name}
 
-    if len(db_team.boreholes) > 9:
+    utc_now = datetime.now(timezone.utc)
+    today_boreholes = [b for b in db_team.boreholes if (b.creation_date.replace(tzinfo=timezone.utc) - utc_now).days >= 1]
+    if len(today_boreholes) >= 3:
         raise HTTPException(status_code=409, detail="Превышен лимит числа скважин для команды")
 
     file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}_{len(db_team.boreholes) + 1}"
@@ -161,7 +162,8 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     bh_create = schema.BoreholeCreate(name = borehole_name
                                     , bit_current_position = md
                                     , file_path = file_path
-                                    , team_id = db_team.id)
+                                    , team_id = db_team.id
+                                    , created_at = utc_now)
     db_borehole = crud.create_borehole(db, bh_create)
     db_team.boreholes.append(db_borehole)
 

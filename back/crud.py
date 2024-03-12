@@ -26,7 +26,8 @@ def create_borehole(db: Session,
     db_borehole = models.Borehole(name = bh.name
                                 , bit_current_position = bh.bit_current_position
                                 , file_path = bh.file_path
-                                , team_id = bh.team_id)
+                                , team_id = bh.team_id
+                                , creation_date = bh.created_at)
     db.add(db_borehole)
     db.commit()
     db.refresh(db_borehole)

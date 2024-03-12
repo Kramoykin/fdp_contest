@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from pydantic import BaseModel
+
 
 class TeamBase(BaseModel):
     name: str
@@ -21,6 +24,7 @@ class BoreholeCreate(BoreholeBase):
     file_path: str
     team_id: int
     bit_current_position: float
+    created_at: datetime
 
 class Logging(BaseModel):
     file_path: str
