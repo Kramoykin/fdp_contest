@@ -1,5 +1,6 @@
 from typing import Annotated
 import pandas as pd
+import numpy as np
 import lasio 
 import os
 from datetime import datetime, timezone, timedelta
@@ -192,11 +193,12 @@ async def download_logging(
     traj_df = utils.get_trajectory_df(borehole_db.file_path)
 
     borehole_length_MD = traj_df['MD'].values[-1]
-    if (md > borehole_length_MD):
+    if (md >= borehole_length_MD):
         raise HTTPException(status_code=400, detail="значение md не может превышать длину скважины")
 
+
     incremented_bit_position = borehole_db.bit_current_position + md
-    traj_df = traj_df[traj_df["MD"] <= incremented_bit_position]
+    traj_df = traj_df[(traj_df["MD"] >= borehole_db.bit_current_position) & (traj_df["MD"] < incremented_bit_position)]
 
     grid_df = pd.read_csv(f"data/grids/{db_team.name}.csv")
 
@@ -211,8 +213,13 @@ async def download_logging(
     las.insert_curve(1, "GR", curve, unit="API", descr="Gamma Ray")
     logging_file_path = f"data/teams/{db_team.name}/loggings/{borehole_db.name}.las"
     os.makedirs(os.path.dirname(logging_file_path), exist_ok=True)
-    with open(logging_file_path, 'w+') as fobj:
-        las.write(fobj, version=2.0)
+    with open(logging_file_path, "a") as fobj:
+        if (os.stat(logging_file_path).st_size == 0):
+            las.write(fobj, version=2.0)
+        else:
+            data = las.data
+            data = np.array(data)
+            np.savetxt(fobj, data, fmt='%-12.5f')
 
     logging = borehole_db.logging
     if (logging == None):
