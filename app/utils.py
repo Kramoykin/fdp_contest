@@ -2,6 +2,8 @@ from scipy.spatial import cKDTree
 import pandas as pd
 import numpy as np
 from scipy.interpolate import CubicSpline
+import os
+from lasio import LASFile
 
 def parse_traj_data(file_path: str) -> pd.DataFrame:
     with open(file_path, 'r') as file:
@@ -53,3 +55,29 @@ def get_trajectory_df(file_path: str) -> pd.DataFrame:
     traj_df = interpolate_well_trajectory(traj_df, new_step=0.1)
 
     return traj_df
+
+def write_file_full_path(file_path: str, data: bytes) -> None:
+    """ 
+    Записывает data, переданную в байтах в файл по пути file_path. 
+    Если файл не существует, то создает его вместе со всеми 
+    поддиректориями, переданными в пути
+    """
+
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, "wb+") as file_object:
+        file_object.write(data)
+
+def write_or_append_las(file_path: str, las_file: LASFile) -> None:
+    """
+    Создаёт файл с каротажем, или дописывает новые данные в файл 
+    существующего каротажа. Поддиректории, указанные в 
+    file_path создаются при создании файла
+    """
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, "a") as fobj:
+        if (os.stat(file_path).st_size == 0):
+            las_file.write(fobj, version=2.0)
+        else:
+            data = las_file.data
+            data = np.array(data)
+            np.savetxt(fobj, data, fmt='%-12.5f')

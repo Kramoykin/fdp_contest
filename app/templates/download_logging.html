@@ -26,6 +26,7 @@
             font-weight: bold;
         }
         input[type="text"],
+        input[type="range"],
         button {
             width: 100%;
             padding: 10px;
@@ -66,12 +67,22 @@
 
         <div>
             <label for="md">Инкремент положения долота:</label>
-            <input type="text" id="md" name="md" />
+            <input type="range" id="md" name="md" min="50.0" max="150.0" step="50" value="50.0">
+            <output id="md_value">50.0</output>
         </div>
 
         <div>
             <button>Получить</button>
         </div>
     </form>
+
+    <script>
+        const mdInput = document.getElementById('md');
+        const mdValueOutput = document.getElementById('md_value');
+
+        mdInput.addEventListener('input', function() {
+            mdValueOutput.textContent = this.value;
+        });
+    </script>
 </body>
 </html>

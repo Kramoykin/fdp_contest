@@ -1,7 +1,7 @@
 from typing import Annotated
 import pandas as pd
 import numpy as np
-import lasio 
+from lasio import LASFile 
 import os
 from datetime import datetime, timezone, timedelta
 
@@ -69,6 +69,9 @@ def create_team(secret: str, team: schema.TeamCreate, db: Session = Depends(get_
 @app.post('/teams/grid')
 async def upload(request: Request,
                  db: Session = Depends(get_db)):
+    """
+    Загружает на сервер файл с гридом месторождения для указанной команды
+    """
     body_validator = MaxBodySizeValidator(MAX_REQUEST_BODY_SIZE)
     
     if (request.query_params["secret"] != ADMIN_SECRET):
@@ -119,6 +122,18 @@ async def read_item(request: Request):
         request=request, name="create_borehole.html"
     )
 
+def validate_team(db_team: schema.Team, password: str) -> None:
+    """
+    Валидирует команду, в случае отсутствия команды с таким именем или паролем
+    выбрасывает HTTPException
+    """
+
+    if not db_team:
+            raise HTTPException(status_code=400, detail="Нет такой команды")
+        
+    if password != db_team.password:
+        raise HTTPException(status_code=401, detail="Неправильный пароль")
+
 @app.post("/borehole/")
 async def upload_borehole(team_name: Annotated[str, Form()]
                         , password: Annotated[str, Form()]
@@ -126,12 +141,20 @@ async def upload_borehole(team_name: Annotated[str, Form()]
                         , md: Annotated[float, Form()]
                         , file: Annotated[UploadFile, File()]
                         , db: Session = Depends(get_db)):
+    """
+    Добавляет команде новую скважину (если скважины с именем borehole_name не существует).
+    Загружает файл с траекторией скважины на сервер.
+    Выставляет глубину начала бурения для скважины в значение md.
+    Если скважина с именем borehole_name существует, то обновляет 
+    файл с траекторией существующей скважины
+    """
     db_team = crud.get_team_by_name(db, name=team_name)
-    if not db_team:
-        raise HTTPException(status_code=400, detail="Нет такой команды")
-    
-    if password != db_team.password:
-        raise HTTPException(status_code=401, detail="Неправильный пароль")
+    validate_team(db_team, password)
+
+    utc_now = datetime.now(timezone.utc)
+    today_boreholes = [b for b in db_team.boreholes if (b.creation_date.replace(tzinfo=timezone.utc) - utc_now).days >= 1]
+    if len(today_boreholes) >= 3:
+        raise HTTPException(status_code=409, detail="Превышен лимит числа создания скважин в день")
     
     if file.size < 100 or file.size > 1000000:
         raise HTTPException(status_code=400, detail=" Неподходящий размер файла")
@@ -139,26 +162,16 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     same_name_boreholes = set([b for b in db_team.boreholes if b.name == borehole_name])
     if (len(same_name_boreholes) == 1):
         existing_borehole = same_name_boreholes.pop()
-        file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}_{len(db_team.boreholes)}"
+        borehole_dir_name = f"data/teams/{db_team.name}/boreholes/{borehole_name}"
+        file_count = len([name for name in os.listdir(borehole_dir_name)])
+        file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}/{file_count+1}"
 
-        if (md < existing_borehole.bit_current_position):
-            raise HTTPException(status_code=400, detail="Глубина бурения для новой траектории не может быть меньше текущей")
+        utils.write_file_full_path(file_path, file.file.read())
 
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "wb+") as file_object:
-            file_object.write(file.file.read())
+        return {"Обновлена траектория для скважины": existing_borehole.name}
 
-        return {"existing_borehole": existing_borehole.name}
-
-    utc_now = datetime.now(timezone.utc)
-    today_boreholes = [b for b in db_team.boreholes if (b.creation_date.replace(tzinfo=timezone.utc) - utc_now).days >= 1]
-    if len(today_boreholes) >= 3:
-        raise HTTPException(status_code=409, detail="Превышен лимит числа скважин для команды")
-
-    file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}_{len(db_team.boreholes) + 1}"
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(file_path, "wb+") as file_object:
-        file_object.write(file.file.read())
+    file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}/1"
+    utils.write_file_full_path(file_path, file.file.read())
 
     bh_create = schema.BoreholeCreate(name = borehole_name
                                     , bit_current_position = md
@@ -168,8 +181,32 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     db_borehole = crud.create_borehole(db, bh_create)
     db_team.boreholes.append(db_borehole)
 
-    return {"borehole": db_borehole.name}
+    return {"Создана скважина": db_borehole.name}
 
+def create_las(borehole_file_path: str
+                , team_grid_file_path: str
+                , current_bit_position: float
+                , incremented_bit_position: float) -> LASFile:
+    """
+    Создаёт файл с каротажом, используя отфильтрованный датафрейм траектории скважины
+    и датафрейм грида месторождения, соответствующего команде
+    """
+    traj_df = utils.get_trajectory_df(borehole_file_path)
+    traj_df = traj_df[(traj_df["MD"] >= current_bit_position) & (traj_df["MD"] < incremented_bit_position)]
+
+    grid_df = pd.read_csv(team_grid_file_path)
+
+    indices = utils.find_closest_indices_xyz(target_coords=traj_df[['X', 'Y', 'Z']].to_numpy(), 
+                                   coords=grid_df[['X_UTME', 'Y_UTMN', 'Z_TVDSS']].to_numpy()
+                                   )
+                                   
+    curve = grid_df.GAMMARAY.to_numpy()[indices]
+
+    las = LASFile()
+    las.insert_curve(0, "DEPT", traj_df['MD'], unit="m", descr="Depth")
+    las.insert_curve(1, "GR", curve, unit="API", descr="Gamma Ray")
+
+    return las
 
 @app.post("/logging", response_class=Response)
 async def download_logging(
@@ -178,48 +215,28 @@ async def download_logging(
                   , borehole_name: Annotated[str, Form()]
                   , md: Annotated[float, Form()]
                   , db: Session = Depends(get_db)):
+    """
+    Имитирует процесс бурения вдоль траектории скважины. 
+    Добавляет значение md к параметру положения долота
+    для скважины borehole_name, возвращает файл каротажа,
+    сгенерированный от точки начала бурения скважины до последнего 
+    инкремента положения долота
+    """
     db_team = crud.get_team_by_name(db, name=team_name)
-    if not db_team:
-        raise HTTPException(status_code=400, detail="Нет такой команды")
+    validate_team(db_team, password)
     
-    if password != db_team.password:
-        raise HTTPException(status_code=401, detail="Неправильный пароль")
+    if md not in [50.0, 100.0, 150.0]:
+        raise HTTPException(status_code=400, detail="Значение должно быть одним из: 50.0, 100.0, 150.0")
     
     boreholes = [bh for bh in db_team.boreholes if bh.name == borehole_name]
-    if (len(boreholes) == 0):
+    borehole_db = next(iter(boreholes), None)
+    if not borehole_db:
         raise HTTPException(status_code=400, detail="Нет скважины с таким именем")
-    borehole_db = boreholes[0]
-
-    traj_df = utils.get_trajectory_df(borehole_db.file_path)
-
-    borehole_length_MD = traj_df['MD'].values[-1]
-    if (md >= borehole_length_MD):
-        raise HTTPException(status_code=400, detail="значение md не может превышать длину скважины")
-
 
     incremented_bit_position = borehole_db.bit_current_position + md
-    traj_df = traj_df[(traj_df["MD"] >= borehole_db.bit_current_position) & (traj_df["MD"] < incremented_bit_position)]
-
-    grid_df = pd.read_csv(f"data/grids/{db_team.name}.csv")
-
-    indices = utils.find_closest_indices_xyz(target_coords=traj_df[['X', 'Y', 'Z']].to_numpy(), 
-                                   coords=grid_df[['X_UTME', 'Y_UTMN', 'Z_TVDSS']].to_numpy()
-                                   )
-                                   
-    curve = grid_df.GAMMARAY.to_numpy()[indices]
-
-    las = lasio.LASFile()
-    las.insert_curve(0, "DEPT", traj_df['MD'], unit="m", descr="Depth")
-    las.insert_curve(1, "GR", curve, unit="API", descr="Gamma Ray")
+    las = create_las(borehole_db.file_path, db_team.grid_file_path, borehole_db.bit_current_position, incremented_bit_position)
     logging_file_path = f"data/teams/{db_team.name}/loggings/{borehole_db.name}.las"
-    os.makedirs(os.path.dirname(logging_file_path), exist_ok=True)
-    with open(logging_file_path, "a") as fobj:
-        if (os.stat(logging_file_path).st_size == 0):
-            las.write(fobj, version=2.0)
-        else:
-            data = las.data
-            data = np.array(data)
-            np.savetxt(fobj, data, fmt='%-12.5f')
+    utils.write_or_append_las(logging_file_path, las)
 
     logging = borehole_db.logging
     if (logging == None):

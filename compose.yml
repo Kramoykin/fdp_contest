@@ -1,0 +1,6 @@
+services:
+  fdp_contest:
+    build: .
+    ports:
+      - "8000:80"
+    restart: always
