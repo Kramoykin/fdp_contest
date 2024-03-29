@@ -118,8 +118,8 @@ async def upload(request: Request,
 
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    return templates.TemplateResponse(
-        request=request, name="create_borehole.html"
+    url = "http://192.168.19.194:8000/borehole"
+    return templates.TemplateResponse("create_borehole.html", {"request": request, "url": url}
     )
 
 def validate_team(db_team: schema.Team, password: str) -> None:
@@ -250,6 +250,6 @@ async def download_logging(
 
 @app.get("/logging", response_class=HTMLResponse)
 async def read_item(request: Request):
-    return templates.TemplateResponse(
-        request=request, name="download_logging.html"
+    url = "http://192.168.19.194:8000/logging"
+    return templates.TemplateResponse("download_logging.html", {"request": request, "url": url}
     )

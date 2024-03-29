@@ -74,10 +74,17 @@ def write_or_append_las(file_path: str, las_file: LASFile) -> None:
     file_path создаются при создании файла
     """
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(file_path, "a") as fobj:
-        if (os.stat(file_path).st_size == 0):
+    # with open(file_path, "a") as fobj:
+    if (os.stat(file_path).st_size == 0):
+        with open(file_path, "w+") as fobj:
             las_file.write(fobj, version=2.0)
-        else:
+    else:
+        with open(file_path, "r") as fobj:
+            old_las = LASFile(file_path)
+        with open(file_path, "w+") as fobj:
+            old_data = old_las.data
             data = las_file.data
-            data = np.array(data)
-            np.savetxt(fobj, data, fmt='%-12.5f')
+            data = np.concatenate((np.array(data), np.array(old_data)), axis=0)
+            las_file.data = data
+            las_file.write(fobj, version=2.0)
+            # np.savetxt(fobj, data, fmt=' %-12.5f')
