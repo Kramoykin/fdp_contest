@@ -12,4 +12,7 @@ WORKDIR /app
 
 EXPOSE 80
 
+# Изменить значение переменной на актуальный адрес хоста
+ENV HOST_IP "172.30.64.1"
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--loop", "asyncio"]

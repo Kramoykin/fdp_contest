@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from lasio import LASFile 
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -28,7 +28,8 @@ def get_db():
     finally:
         db.close()
 
-ADMIN_SECRET = "aaaaaa"
+HOST_IP = os.getenv("LOCAL_IP")
+ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
 MAX_FILE_SIZE = 1024 * 1024 * 1024 * 4  # = 4GB
 MAX_REQUEST_BODY_SIZE = MAX_FILE_SIZE + 1024
@@ -118,7 +119,7 @@ async def upload(request: Request,
 
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = "http://192.168.19.194:8000/borehole"
+    url = f"http://{HOST_IP}:8000/borehole"
     return templates.TemplateResponse("create_borehole.html", {"request": request, "url": url}
     )
 
@@ -250,6 +251,6 @@ async def download_logging(
 
 @app.get("/logging", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = "http://192.168.19.194:8000/logging"
+    url = f"http://{HOST_IP}:8000/logging"
     return templates.TemplateResponse("download_logging.html", {"request": request, "url": url}
     )
