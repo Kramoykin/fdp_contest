@@ -28,7 +28,8 @@ def get_db():
     finally:
         db.close()
 
-HOST_IP = os.getenv("LOCAL_IP")
+HOST_IP = os.getenv("HOST_IP")
+print(f"Host ip: {HOST_IP}")
 ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
 MAX_FILE_SIZE = 1024 * 1024 * 1024 * 4  # = 4GB

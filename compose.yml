@@ -1,5 +1,8 @@
 services:
   fdp_contest:
+    environment:
+      # Поменять на актуальный адрес хоста
+      - HOST_IP=192.168.19.194
     volumes:
       - ./data:/app/data
     build: .
