@@ -33,6 +33,7 @@ ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
 MAX_FILE_SIZE = 1024 * 1024 * 1024 * 4  # = 4GB
 MAX_REQUEST_BODY_SIZE = MAX_FILE_SIZE + 1024
+os.makedirs(os.path.dirname("./data"), exist_ok=True)
 
 models.Base.metadata.create_all(bind=engine)
 

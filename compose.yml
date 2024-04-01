@@ -1,5 +1,7 @@
 services:
   fdp_contest:
+    volumes:
+      - ./data:/app/data
     build: .
     ports:
       - "8000:80"
