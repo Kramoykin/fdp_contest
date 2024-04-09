@@ -1,9 +1,10 @@
 from typing import Annotated
 import pandas as pd
-import numpy as np
 from lasio import LASFile 
 import os
 from datetime import datetime, timezone
+import asyncio
+
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -21,14 +22,17 @@ import crud, models, schema, utils
 from database import SessionLocal, engine
 
 # Dependency
-def get_db():
+async def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-HOST_IP = os.getenv("HOST_IP")
+lock = asyncio.Lock()
+
+# HOST_IP = os.getenv("HOST_IP")
+HOST_IP = "localhost"
 print(f"Host ip: {HOST_IP}")
 ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
@@ -225,6 +229,7 @@ async def download_logging(
     сгенерированный от точки начала бурения скважины до последнего 
     инкремента положения долота
     """
+
     db_team = crud.get_team_by_name(db, name=team_name)
     validate_team(db_team, password)
     
@@ -237,14 +242,15 @@ async def download_logging(
         raise HTTPException(status_code=400, detail="Нет скважины с таким именем")
 
     incremented_bit_position = borehole_db.bit_current_position + md
-    las = create_las(borehole_db.file_path, db_team.grid_file_path, borehole_db.bit_current_position, incremented_bit_position)
+    las = await asyncio.to_thread(create_las, borehole_db.file_path, db_team.grid_file_path, borehole_db.bit_current_position, incremented_bit_position)
     logging_file_path = f"data/teams/{db_team.name}/loggings/{borehole_db.name}.las"
-    utils.write_or_append_las(logging_file_path, las)
+    await asyncio.to_thread(utils.write_or_append_las, logging_file_path, las)
+
 
     logging = borehole_db.logging
     if (logging == None):
         logging = schema.Logging(borehole_id = borehole_db.id
-                               , file_path = logging_file_path)
+                            , file_path = logging_file_path)
         crud.create_logging(db, logging)
     borehole_db.bit_current_position = incremented_bit_position
     db.commit()
