@@ -67,14 +67,20 @@
 
         <div>
             <label for="md">Инкремент положения долота:</label>
-            <input type="range" id="md" name="md" min="50.0" max="150.0" step="50" value="50.0">
-            <output id="md_value">50.0</output>
+            <input type="range" id="md" name="md" min="10.0" max="30.0" step="20" value="10.0">
+            <output id="md_value">10.0</output>
         </div>
 
         <div>
             <button>Получить</button>
         </div>
+
+        <div>
+            <a href="http://fdp-test.hw.tpu.ru" class="create-or-edit-link">Создать или изменить траекторию скважины</a>
+        </div>
     </form>
+
+    
 
     <script>
         const mdInput = document.getElementById('md');
