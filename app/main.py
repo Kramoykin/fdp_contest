@@ -32,9 +32,9 @@ async def get_db():
 
 lock = asyncio.Lock()
 
-# HOST_IP = os.getenv("HOST_IP")
+HOST_IP = os.getenv("HOST_IP")
 # HOST_IP = "localhost"
-HOST_IP = "http://fdp-test.hw.tpu.ru"
+# HOST_IP = "http://fdp-test.hw.tpu.ru"
 print(f"Host ip: {HOST_IP}")
 ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
