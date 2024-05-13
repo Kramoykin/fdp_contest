@@ -19,6 +19,7 @@ class Team(Base):
     grid_file_path: Mapped[str] = mapped_column(unique=True, nullable = True)
 
     boreholes: Mapped[List["Borehole"]] = relationship(back_populates="team")
+    drilling_histories: Mapped[List["DrillingHistory"]] = relationship(back_populates="team")
 
 class Borehole(Base):
     __tablename__ = "boreholes"
@@ -33,6 +34,22 @@ class Borehole(Base):
 
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
     team: Mapped["Team"] = relationship(back_populates="boreholes")
+
+    drilling_histories: Mapped[List["DrillingHistory"]] = relationship(back_populates="borehole")
+
+class DrillingHistory(Base):
+    __tablename__ = "drilling_histories"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    file_path: Mapped[str] = mapped_column()
+    bit_position: Mapped[float] = mapped_column(default=0.0) # текущее положение долота в метрах
+    date: Mapped[datetime] = mapped_column()
+
+    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
+    team: Mapped["Team"] = relationship(back_populates="drilling_histories")
+
+    borehole_id: Mapped[int] = mapped_column(ForeignKey("boreholes.id"))
+    borehole: Mapped["Borehole"] = relationship(back_populates="drilling_histories")
 
 class Logging(Base):
     __tablename__ = "loggings"

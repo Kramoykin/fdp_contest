@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
+from datetime import datetime
 
 import models, schema
 
@@ -32,6 +33,20 @@ def create_borehole(db: Session,
     db.commit()
     db.refresh(db_borehole)
     return db_borehole
+
+def create_drilling_history(db: Session, 
+                    bh: models.Borehole,
+                    date: datetime):
+    db_drilling_history = models.DrillingHistory(file_path = bh.file_path,
+                                                 bit_position = bh.bit_current_position,
+                                                 date = date,
+                                                 team_id = bh.team_id,
+                                                 borehole_id = bh.id)
+
+    db.add(db_drilling_history)
+    db.commit()
+    db.refresh(db_drilling_history)
+    return db_drilling_history
 
 def get_team_borehole_by_name(db: Session
                             , team_name: str

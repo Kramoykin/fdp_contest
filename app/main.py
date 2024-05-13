@@ -4,6 +4,12 @@ import numpy as np
 from lasio import LASFile 
 import os
 from datetime import datetime, timezone
+from fastapi.concurrency import run_in_threadpool
+from functools import partial
+
+
+import asyncio
+import time
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -28,7 +34,10 @@ def get_db():
     finally:
         db.close()
 
-HOST_IP = os.getenv("HOST_IP")
+lock = asyncio.Lock()
+
+# HOST_IP = os.getenv("HOST_IP")
+HOST_IP = "localhost"
 print(f"Host ip: {HOST_IP}")
 ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
@@ -171,6 +180,12 @@ async def upload_borehole(team_name: Annotated[str, Form()]
 
         utils.write_file_full_path(file_path, file.file.read())
 
+        db_dhs = crud.create_drilling_history(db, existing_borehole, utc_now)
+        db_team.drilling_histories.append(db_dhs)
+        existing_borehole.drilling_histories.append(db_dhs)
+        existing_borehole.file_path = file_path
+        db.commit()
+
         return {"Обновлена траектория для скважины": existing_borehole.name}
 
     file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}/1"
@@ -184,6 +199,10 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     db_borehole = crud.create_borehole(db, bh_create)
     db_team.boreholes.append(db_borehole)
 
+    db_dhs = crud.create_drilling_history(db, db_borehole, utc_now)
+    db_team.drilling_histories.append(db_dhs)
+    db_borehole.drilling_histories.append(db_dhs)
+
     return {"Создана скважина": db_borehole.name}
 
 def create_las(borehole_file_path: str
@@ -194,6 +213,8 @@ def create_las(borehole_file_path: str
     Создаёт файл с каротажом, используя отфильтрованный датафрейм траектории скважины
     и датафрейм грида месторождения, соответствующего команде
     """
+    start = time.time()
+
     traj_df = utils.get_trajectory_df(borehole_file_path)
     traj_df = traj_df[(traj_df["MD"] >= current_bit_position) & (traj_df["MD"] < incremented_bit_position)]
 
@@ -211,6 +232,11 @@ def create_las(borehole_file_path: str
 
     return las
 
+async def async_create_las(file_path, grid_file_path, current_position, incremented_bit_position):
+    loop = asyncio.get_running_loop()
+    las = await loop.run_in_executor(None, partial(create_las, file_path, grid_file_path, current_position, incremented_bit_position))
+    return las
+
 @app.post("/logging", response_class=Response)
 async def download_logging(
                     team_name: Annotated[str, Form()]
@@ -225,6 +251,7 @@ async def download_logging(
     сгенерированный от точки начала бурения скважины до последнего 
     инкремента положения долота
     """
+
     db_team = crud.get_team_by_name(db, name=team_name)
     validate_team(db_team, password)
     
@@ -244,10 +271,15 @@ async def download_logging(
     logging = borehole_db.logging
     if (logging == None):
         logging = schema.Logging(borehole_id = borehole_db.id
-                               , file_path = logging_file_path)
+                            , file_path = logging_file_path)
         crud.create_logging(db, logging)
     borehole_db.bit_current_position = incremented_bit_position
     db.commit()
+
+    utc_now = datetime.now(timezone.utc)
+    db_dhs = crud.create_drilling_history(db, borehole_db, utc_now)
+    db_team.drilling_histories.append(db_dhs)
+    borehole_db.drilling_histories.append(db_dhs)
 
     return FileResponse(logging_file_path, filename=f"{db_team.name}_{borehole_db.name}_output.las", media_type="application/octet-stream")
 
