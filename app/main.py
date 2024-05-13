@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timezone
 import asyncio
 import numpy as np
-
+from functools import partial
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -33,8 +33,8 @@ async def get_db():
 lock = asyncio.Lock()
 
 # HOST_IP = os.getenv("HOST_IP")
-# HOST_IP = "localhost"
-HOST_IP = "http://fdp-test.hw.tpu.ru"
+HOST_IP = "http://localhost:8000"
+# HOST_IP = "http://fdp-test.hw.tpu.ru"
 print(f"Host ip: {HOST_IP}")
 ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
@@ -174,13 +174,14 @@ async def upload_borehole(team_name: Annotated[str, Form()]
         borehole_dir_name = f"data/teams/{db_team.name}/boreholes/{borehole_name}"
         file_count = len([name for name in os.listdir(borehole_dir_name)])
         file_path = f"data/teams/{db_team.name}/boreholes/{borehole_name}/{file_count+1}"
+        existing_borehole.file_path = file_path
 
         utils.write_file_full_path(file_path, file.file.read())
 
         db_dhs = crud.create_drilling_history(db, existing_borehole, utc_now)
         db_team.drilling_histories.append(db_dhs)
         existing_borehole.drilling_histories.append(db_dhs)
-        existing_borehole.file_path = file_path
+        
         db.commit()
 
         return {"Обновлена траектория для скважины": existing_borehole.name}
@@ -210,8 +211,6 @@ def create_las(borehole_file_path: str
     Создаёт файл с каротажом, используя отфильтрованный датафрейм траектории скважины
     и датафрейм грида месторождения, соответствующего команде
     """
-    start = time.time()
-
     traj_df = utils.get_trajectory_df(borehole_file_path)
     traj_df = traj_df[(traj_df["MD"] >= current_bit_position) & (traj_df["MD"] < incremented_bit_position)]
 
@@ -252,7 +251,6 @@ async def download_logging(
     инкремента положения долота
     """
 
-
     db_team = crud.get_team_by_name(db, name=team_name)
     validate_team(db_team, password)
     
@@ -273,7 +271,6 @@ async def download_logging(
     logging = borehole_db.logging
     if (logging == None):
         logging = schema.Logging(borehole_id = borehole_db.id
-                            , file_path = logging_file_path)
                             , file_path = logging_file_path)
         crud.create_logging(db, logging)
     borehole_db.bit_current_position = incremented_bit_position
