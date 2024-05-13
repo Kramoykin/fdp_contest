@@ -1,15 +1,11 @@
 from typing import Annotated
 import pandas as pd
-import numpy as np
 from lasio import LASFile 
 import os
 from datetime import datetime, timezone
-from fastapi.concurrency import run_in_threadpool
-from functools import partial
-
-
 import asyncio
-import time
+import numpy as np
+
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -27,7 +23,7 @@ import crud, models, schema, utils
 from database import SessionLocal, engine
 
 # Dependency
-def get_db():
+async def get_db():
     db = SessionLocal()
     try:
         yield db
@@ -37,7 +33,8 @@ def get_db():
 lock = asyncio.Lock()
 
 # HOST_IP = os.getenv("HOST_IP")
-HOST_IP = "localhost"
+# HOST_IP = "localhost"
+HOST_IP = "http://fdp-test.hw.tpu.ru"
 print(f"Host ip: {HOST_IP}")
 ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
@@ -130,7 +127,7 @@ async def upload(request: Request,
 
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = f"http://{HOST_IP}:8000/borehole"
+    url = f"{HOST_IP}/borehole"
     return templates.TemplateResponse("create_borehole.html", {"request": request, "url": url}
     )
 
@@ -225,6 +222,9 @@ def create_las(borehole_file_path: str
                                    )
                                    
     curve = grid_df.GAMMARAY.to_numpy()[indices]
+    np.random.seed(0)
+    noize = np.random.normal(0, 2, len(curve))
+    curve = curve + noize
 
     las = LASFile()
     las.insert_curve(0, "DEPT", traj_df['MD'], unit="m", descr="Depth")
@@ -252,11 +252,12 @@ async def download_logging(
     инкремента положения долота
     """
 
+
     db_team = crud.get_team_by_name(db, name=team_name)
     validate_team(db_team, password)
     
-    if md not in [50.0, 100.0, 150.0]:
-        raise HTTPException(status_code=400, detail="Значение должно быть одним из: 50.0, 100.0, 150.0")
+    if md not in [10.0, 30.0]:
+        raise HTTPException(status_code=400, detail="Значение должно быть одним из: 10.0, 30.0")
     
     boreholes = [bh for bh in db_team.boreholes if bh.name == borehole_name]
     borehole_db = next(iter(boreholes), None)
@@ -264,13 +265,15 @@ async def download_logging(
         raise HTTPException(status_code=400, detail="Нет скважины с таким именем")
 
     incremented_bit_position = borehole_db.bit_current_position + md
-    las = create_las(borehole_db.file_path, db_team.grid_file_path, borehole_db.bit_current_position, incremented_bit_position)
+    las = await asyncio.to_thread(create_las, borehole_db.file_path, db_team.grid_file_path, borehole_db.bit_current_position, incremented_bit_position)
     logging_file_path = f"data/teams/{db_team.name}/loggings/{borehole_db.name}.las"
-    utils.write_or_append_las(logging_file_path, las)
+    await asyncio.to_thread(utils.write_or_append_las, logging_file_path, las)
+
 
     logging = borehole_db.logging
     if (logging == None):
         logging = schema.Logging(borehole_id = borehole_db.id
+                            , file_path = logging_file_path)
                             , file_path = logging_file_path)
         crud.create_logging(db, logging)
     borehole_db.bit_current_position = incremented_bit_position
@@ -285,6 +288,6 @@ async def download_logging(
 
 @app.get("/logging", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = f"http://{HOST_IP}:8000/logging"
+    url = f"{HOST_IP}/logging"
     return templates.TemplateResponse("download_logging.html", {"request": request, "url": url}
     )
