@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import asyncio
 import numpy as np
 from functools import partial
+import debugpy
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
 from fastapi.responses import HTMLResponse, Response, FileResponse
@@ -29,6 +30,11 @@ async def get_db():
         yield db
     finally:
         db.close()
+environment = os.environ.get('LAUNCH_ENV')
+if environment == "Development":
+    debugpy.listen(('0.0.0.0', 5678))
+    print("Waiting for debugger attach")
+    debugpy.wait_for_client()
 
 lock = asyncio.Lock()
 
