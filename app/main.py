@@ -32,13 +32,11 @@ async def get_db():
 
 lock = asyncio.Lock()
 
-# HOST_IP = os.getenv("HOST_IP")
-HOST_IP = "http://localhost:8000"
-# HOST_IP = "http://fdp-test.hw.tpu.ru"
+HOST_IP = "http://fdp.hw.tpu.ru"
 print(f"Host ip: {HOST_IP}")
 ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
-MAX_FILE_SIZE = 1024 * 1024 * 1024 * 4  # = 4GB
+MAX_FILE_SIZE = 1024 * 1024 * 1024 * 7  # = 7GB
 MAX_REQUEST_BODY_SIZE = MAX_FILE_SIZE + 1024
 os.makedirs(os.path.dirname("./data"), exist_ok=True)
 
