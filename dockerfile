@@ -10,4 +10,6 @@ ADD ./app /app
 
 WORKDIR /app
 
+ENV LAUNCH_ENV=Development
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--loop", "asyncio"]
