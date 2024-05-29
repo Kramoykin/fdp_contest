@@ -31,6 +31,7 @@ async def get_db():
     finally:
         db.close()
 environment = os.environ.get('LAUNCH_ENV')
+print(environment)
 if environment == "Development":
     debugpy.listen(('0.0.0.0', 5678))
     print("Waiting for debugger attach")
