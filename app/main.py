@@ -167,7 +167,7 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     validate_team(db_team, password)
 
     dt_now = datetime.now()
-    today_boreholes = [b for b in db_team.boreholes if (b.creation_date - dt_now).days >= 1]
+    today_boreholes = [b for b in db_team.boreholes if (dt_now - b.creation_date).days < 1]
     if len(today_boreholes) >= 3:
         raise HTTPException(status_code=409, detail="Превышен лимит числа создания скважин в день")
     
