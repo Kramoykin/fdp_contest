@@ -1,12 +1,12 @@
 services:
   fdp_contest:
-    # environment:
-    #   - HOST_IP=192.168.19.17:8000
-    #   - LAUNCH_ENV = Development
+    environment:
+      - HOST_IP=192.168.19.18:8000
+      - LAUNCH_ENV = Development
     volumes:
       - ./data:/app/data
     build: .
     ports:
       - "8000:8001"
-      - "5678:5678"
+      # - "5678:5678"
     restart: always

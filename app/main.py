@@ -30,17 +30,18 @@ async def get_db():
         yield db
     finally:
         db.close()
-environment = os.environ.get('LAUNCH_ENV')
-print(environment)
-if environment == "Development":
-    debugpy.listen(('0.0.0.0', 5678))
-    print("Waiting for debugger attach")
-    debugpy.wait_for_client()
+
+# environment = os.environ.get('LAUNCH_ENV')
+# print(environment)
+# if environment == "Development":
+#     debugpy.listen(('0.0.0.0', 5678))
+#     print("Waiting for debugger attach")
+#     debugpy.wait_for_client()
 
 lock = asyncio.Lock()
 
-HOST_IP = "http://fdp.hw.tpu.ru"
-print(f"Host ip: {HOST_IP}")
+HOST_IP = os.environ.get('HOST_IP')
+print(HOST_IP)
 ADMIN_SECRET = "FhhJhvQ"
 CHUNK_SIZE = 1024
 MAX_FILE_SIZE = 1024 * 1024 * 1024 * 7  # = 7GB
@@ -132,7 +133,7 @@ async def upload(request: Request,
 
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = f"{HOST_IP}/borehole"
+    url = "/borehole"
     return templates.TemplateResponse("create_borehole.html", {"request": request, "url": url}
     )
 
@@ -290,6 +291,5 @@ async def download_logging(
 
 @app.get("/logging", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = f"{HOST_IP}/logging"
-    return templates.TemplateResponse("download_logging.html", {"request": request, "url": url}
-    )
+    url = "/logging"
+    return templates.TemplateResponse("download_logging.html", {"request": request, "url": url})
