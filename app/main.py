@@ -166,8 +166,8 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     db_team = crud.get_team_by_name(db, name=team_name)
     validate_team(db_team, password)
 
-    utc_now = datetime.now(timezone.utc)
-    today_boreholes = [b for b in db_team.boreholes if (b.creation_date.replace(tzinfo=timezone.utc) - utc_now).days >= 1]
+    dt_now = datetime.now()
+    today_boreholes = [b for b in db_team.boreholes if (b.creation_date - dt_now).days >= 1]
     if len(today_boreholes) >= 3:
         raise HTTPException(status_code=409, detail="Превышен лимит числа создания скважин в день")
     
@@ -184,7 +184,7 @@ async def upload_borehole(team_name: Annotated[str, Form()]
 
         utils.write_file_full_path(file_path, file.file.read())
 
-        db_dhs = crud.create_drilling_history(db, existing_borehole, utc_now)
+        db_dhs = crud.create_drilling_history(db, existing_borehole, dt_now)
         db_team.drilling_histories.append(db_dhs)
         existing_borehole.drilling_histories.append(db_dhs)
         
@@ -199,11 +199,11 @@ async def upload_borehole(team_name: Annotated[str, Form()]
                                     , bit_current_position = md
                                     , file_path = file_path
                                     , team_id = db_team.id
-                                    , created_at = utc_now)
+                                    , created_at = dt_now)
     db_borehole = crud.create_borehole(db, bh_create)
     db_team.boreholes.append(db_borehole)
 
-    db_dhs = crud.create_drilling_history(db, db_borehole, utc_now)
+    db_dhs = crud.create_drilling_history(db, db_borehole, dt_now)
     db_team.drilling_histories.append(db_dhs)
     db_borehole.drilling_histories.append(db_dhs)
 
@@ -282,8 +282,8 @@ async def download_logging(
     borehole_db.bit_current_position = incremented_bit_position
     db.commit()
 
-    utc_now = datetime.now(timezone.utc)
-    db_dhs = crud.create_drilling_history(db, borehole_db, utc_now)
+    dt_now = datetime.now()
+    db_dhs = crud.create_drilling_history(db, borehole_db, dt_now)
     db_team.drilling_histories.append(db_dhs)
     borehole_db.drilling_histories.append(db_dhs)
 
