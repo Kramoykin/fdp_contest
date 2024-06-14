@@ -133,7 +133,7 @@ async def upload(request: Request,
 
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = "/borehole"
+    url = "/"
     return templates.TemplateResponse("create_borehole.html", {"request": request, "url": url}
     )
 
@@ -291,5 +291,5 @@ async def download_logging(
 
 @app.get("/logging", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = "/logging"
+    url = "logging"
     return templates.TemplateResponse("download_logging.html", {"request": request, "url": url})
