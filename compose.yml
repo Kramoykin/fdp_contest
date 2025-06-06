@@ -2,7 +2,8 @@ services:
   fdp_contest:
     environment:
       # - HOST_IP=192.168.19.18:8000
-      - HOST_IP=192.168.19.204:8000
+      # - HOST_IP=192.168.19.204:8000
+      - HOST_IP=192.168.19.65:8000
       # - LAUNCH_ENV = Development
     volumes:
       - ./data:/app/data
