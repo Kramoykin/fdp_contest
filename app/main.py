@@ -9,7 +9,7 @@ from functools import partial
 import debugpy
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, UploadFile, File, status
-from fastapi.responses import HTMLResponse, Response, FileResponse
+from fastapi.responses import HTMLResponse, Response, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from streaming_form_data import StreamingFormDataParser
@@ -17,6 +17,8 @@ from streaming_form_data.targets import FileTarget, ValueTarget
 from streaming_form_data.validators import MaxSizeValidator
 import streaming_form_data
 from starlette.requests import ClientDisconnect
+from passlib.context import CryptContext
+from itsdangerous import URLSafeSerializer, BadSignature
 
 from sqlalchemy.orm import Session
 
@@ -55,6 +57,12 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Простой секрет
+SECRET_KEY = "your_very_secret_key"
+COOKIE_NAME = "team_auth"
+serializer = URLSafeSerializer(SECRET_KEY)
 
 class MaxBodySizeException(Exception):
     def __init__(self, body_len: str):
@@ -70,7 +78,26 @@ class MaxBodySizeValidator:
         if self.body_len > self.max_size:
             raise MaxBodySizeException(body_len=self.body_len)
         
-@app.post("/teams/", response_model=schema.Team)
+def get_current_team_from_cookie(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> models.Team:
+    cookie = request.cookies.get(COOKIE_NAME)
+    if not cookie:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
+        team_id = int(serializer.loads(cookie))
+    except (BadSignature, ValueError):
+        raise HTTPException(status_code=403, detail="Invalid auth token")
+
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    return team
+        
+@app.post("/teams", response_model=schema.Team)
 def create_team(secret: str, team: schema.TeamCreate, db: Session = Depends(get_db)):
     if (secret != ADMIN_SECRET):
         raise HTTPException(status_code=403, detail="Недостаточно полномочий")
@@ -150,12 +177,14 @@ def validate_team(db_team: schema.Team, password: str) -> None:
         raise HTTPException(status_code=401, detail="Неправильный пароль")
 
 @app.post("/borehole/")
-async def upload_borehole(team_name: Annotated[str, Form()]
-                        , password: Annotated[str, Form()]
-                        , borehole_name: Annotated[str, Form()]
+async def upload_borehole(borehole_name: Annotated[str, Form()]
                         , md: Annotated[float, Form()]
                         , file: Annotated[UploadFile, File()]
-                        , db: Session = Depends(get_db)):
+                        , db: Session = Depends(get_db)
+                        , db_team: models.Team = Depends(get_current_team_from_cookie)
+                        # , team_name: Annotated[str, Form()]
+                        # , password: Annotated[str, Form()]
+                        ):
     """
     Добавляет команде новую скважину (если скважины с именем borehole_name не существует).
     Загружает файл с траекторией скважины на сервер.
@@ -163,8 +192,8 @@ async def upload_borehole(team_name: Annotated[str, Form()]
     Если скважина с именем borehole_name существует, то обновляет 
     файл с траекторией существующей скважины
     """
-    db_team = crud.get_team_by_name(db, name=team_name)
-    validate_team(db_team, password)
+    # db_team = crud.get_team_by_name(db, name=team_name)
+    # validate_team(db_team, password)
 
     dt_now = datetime.now()
     today_boreholes = [b for b in db_team.boreholes if (dt_now - b.creation_date).days < 1]
@@ -293,3 +322,25 @@ async def download_logging(
 async def read_item(request: Request):
     url = "logging"
     return templates.TemplateResponse("download_logging.html", {"request": request, "url": url})
+
+# Логин-форма
+@app.get("/authorize", response_class=HTMLResponse)
+def authorize_form(request: Request):
+    return templates.TemplateResponse("authorize.html", {"request": request})
+
+# Обработка логина
+@app.post("/authorize")
+def authorize(request: Request, response: Response, team_name: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    db_team = crud.get_team_by_name(db, name=team_name)
+    validate_team(db_team, password)
+
+    token = serializer.dumps(team_name)
+    response = templates.TemplateResponse("create_borehole.html", {"request": request, "url": "/"})
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        samesite="Lax",
+        max_age=60 * 60 * 24)
+    return response
+
