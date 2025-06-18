@@ -59,7 +59,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Простой секрет
+# Настройки куковой авторизации
 SECRET_KEY = "your_very_secret_key"
 COOKIE_NAME = "team_auth"
 serializer = URLSafeSerializer(SECRET_KEY)
@@ -87,11 +87,11 @@ def get_current_team_from_cookie(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        team_id = int(serializer.loads(cookie))
+        team_name = str(serializer.loads(cookie))
     except (BadSignature, ValueError):
         raise HTTPException(status_code=403, detail="Invalid auth token")
 
-    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    team = db.query(models.Team).filter(models.Team.name == team_name).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
@@ -160,7 +160,7 @@ async def upload(request: Request,
 
 @app.get("/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = "/"
+    url = "/borehole"
     return templates.TemplateResponse("create_borehole.html", {"request": request, "url": url}
     )
 
@@ -192,8 +192,6 @@ async def upload_borehole(borehole_name: Annotated[str, Form()]
     Если скважина с именем borehole_name существует, то обновляет 
     файл с траекторией существующей скважины
     """
-    # db_team = crud.get_team_by_name(db, name=team_name)
-    # validate_team(db_team, password)
 
     dt_now = datetime.now()
     today_boreholes = [b for b in db_team.boreholes if (dt_now - b.creation_date).days < 1]
@@ -335,7 +333,7 @@ def authorize(request: Request, response: Response, team_name: str = Form(...), 
     validate_team(db_team, password)
 
     token = serializer.dumps(team_name)
-    response = templates.TemplateResponse("create_borehole.html", {"request": request, "url": "/"})
+    response = templates.TemplateResponse("create_borehole.html", {"request": request, "url": "/borehole"})
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
