@@ -1,11 +1,68 @@
 <!DOCTYPE html>
-<html>
-  <body>
-    <h2>Вход</h2>
-    <form action="/authorize" method="post">
-      <input type="team_name" name="team_name" placeholder="Имя команды" required>
-      <input type="password" name="password" placeholder="Пароль" required>
-      <button type="submit">Войти</button>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в систему</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+        }
+        form {
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="password"],
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <form action="/authorize" method="POST">
+        <div>
+            <label for="team_name">Имя команды:</label>
+            <input type="text" id="team_name" name="team_name" placeholder="Имя команды" required>
+        </div>
+
+        <div>
+            <label for="password">Пароль:</label>
+            <input type="password" id="password" name="password" placeholder="Пароль" required>
+        </div>
+
+        <div>
+            <button type="submit">Войти</button>
+        </div>
     </form>
-  </body>
+</body>
 </html>

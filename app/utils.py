@@ -8,15 +8,11 @@ from lasio import LASFile
 def parse_traj_data(file_path: str) -> pd.DataFrame:
     with open(file_path, 'r') as file:
         lines = file.readlines()
-        data_start = 0
-        for i, line in enumerate(lines):
-            if line.strip().startswith('#====='):
-                data_start = i + 1
-                break
-            
-        column_names = lines[data_start].split()
-        df = pd.DataFrame([x.split() for x in lines[data_start + 2:]], columns=column_names)
-        df = df.apply(pd.to_numeric, errors='ignore')
+
+    lines = [line for line in lines if ((not line.strip().startswith('#')) and (line.strip() != ""))]
+    column_names = lines[0].split()
+    df = pd.DataFrame([x.split() for x in lines[1:]], columns=column_names)
+    df = df.apply(pd.to_numeric, errors='ignore')
 
     return df
 

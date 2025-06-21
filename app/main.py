@@ -182,8 +182,6 @@ async def upload_borehole(borehole_name: Annotated[str, Form()]
                         , file: Annotated[UploadFile, File()]
                         , db: Session = Depends(get_db)
                         , db_team: models.Team = Depends(get_current_team_from_cookie)
-                        # , team_name: Annotated[str, Form()]
-                        # , password: Annotated[str, Form()]
                         ):
     """
     Добавляет команде новую скважину (если скважины с именем borehole_name не существует).
@@ -270,12 +268,10 @@ async def async_create_las(file_path, grid_file_path, current_position, incremen
     return las
 
 @app.post("/logging", response_class=Response)
-async def download_logging(
-                    team_name: Annotated[str, Form()]
-                  , password: Annotated[str, Form()]
-                  , borehole_name: Annotated[str, Form()]
-                  , md: Annotated[float, Form()]
-                  , db: Session = Depends(get_db)):
+async def download_logging(borehole_name: Annotated[str, Form()]
+                         , md: Annotated[float, Form()]
+                         , db: Session = Depends(get_db)
+                         , db_team: models.Team = Depends(get_current_team_from_cookie)):
     """
     Имитирует процесс бурения вдоль траектории скважины. 
     Добавляет значение md к параметру положения долота
@@ -284,9 +280,6 @@ async def download_logging(
     инкремента положения долота
     """
 
-    db_team = crud.get_team_by_name(db, name=team_name)
-    validate_team(db_team, password)
-    
     if md not in [10.0, 30.0]:
         raise HTTPException(status_code=400, detail="Значение должно быть одним из: 10.0, 30.0")
     
