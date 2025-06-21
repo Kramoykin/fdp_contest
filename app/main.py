@@ -158,10 +158,9 @@ async def upload(request: Request,
         
     return {"message": f"Successfuly uploaded {filepath}"}
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/borehole/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = "/borehole"
-    return templates.TemplateResponse("create_borehole.html", {"request": request, "url": url}
+    return templates.TemplateResponse("create_borehole.html", {"request": request}
     )
 
 def validate_team(db_team: schema.Team, password: str) -> None:
@@ -267,7 +266,7 @@ async def async_create_las(file_path, grid_file_path, current_position, incremen
     las = await loop.run_in_executor(None, partial(create_las, file_path, grid_file_path, current_position, incremented_bit_position))
     return las
 
-@app.post("/logging", response_class=Response)
+@app.post("/logging/", response_class=Response)
 async def download_logging(borehole_name: Annotated[str, Form()]
                          , md: Annotated[float, Form()]
                          , db: Session = Depends(get_db)
@@ -309,10 +308,9 @@ async def download_logging(borehole_name: Annotated[str, Form()]
 
     return FileResponse(logging_file_path, filename=f"{db_team.name}_{borehole_db.name}_output.las", media_type="application/octet-stream")
 
-@app.get("/logging", response_class=HTMLResponse)
+@app.get("/logging/", response_class=HTMLResponse)
 async def read_item(request: Request):
-    url = "logging"
-    return templates.TemplateResponse("download_logging.html", {"request": request, "url": url})
+    return templates.TemplateResponse("download_logging.html", {"request": request})
 
 # Логин-форма
 @app.get("/authorize", response_class=HTMLResponse)
@@ -326,7 +324,7 @@ def authorize(request: Request, response: Response, team_name: str = Form(...), 
     validate_team(db_team, password)
 
     token = serializer.dumps(team_name)
-    response = templates.TemplateResponse("create_borehole.html", {"request": request, "url": "/borehole"})
+    response = templates.TemplateResponse("create_borehole.html", {"request": request})
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
