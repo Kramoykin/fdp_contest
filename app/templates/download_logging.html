@@ -1,84 +1,117 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Выгрузить каротаж</title>
-    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            margin: 0;
-            padding: 0;
-        }
-        form {
-            max-width: 400px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        label {
-            display: block;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
-        input[type="text"],
-        input[type="range"],
-        button {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-sizing: border-box;
-        }
-        button {
-            background-color: #007bff;
-            color: #fff;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Выгрузить каротаж</title>
+  <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+    }
+    form {
+      max-width: 400px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    input[type="text"],
+    input[type="range"],
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #007bff;
+      color: #fff;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:disabled {
+      background-color: #888;
+      cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background-color: #0056b3;
+    }
+  </style>
 </head>
 <body>
-    <form action=/logging method="POST">
-        <div>
-            <label for="borehole_name">Имя скважины:</label>
-            <input type="text" id="borehole_name" name="borehole_name" />
-        </div>
+  <form id="logging-form">
+    <div>
+      <label for="borehole_name">Имя скважины:</label>
+      <input type="text" id="borehole_name" name="borehole_name" required />
+    </div>
 
-        <div>
-            <label for="md">Инкремент положения долота:</label>
-            <input type="range" id="md" name="md" min="10.0" max="30.0" step="20" value="10.0">
-            <output id="md_value">10.0</output>
-        </div>
+    <div>
+      <label for="md">Инкремент положения долота:</label>
+      <input type="range" id="md" name="md" min="10.0" max="30.0" step="20" value="10.0" />
+      <output id="md_value">10.0</output>
+    </div>
 
-        <div>
-            <button>Получить</button>
-        </div>
+    <div>
+      <button type="submit" id="submit-btn">Получить</button>
+    </div>
 
-        <div>
-            <a href= "/borehole" class="create-or-edit-link">Создать или изменить траекторию скважины</a>
-        </div>
-    </form>
+    <div>
+      <a href="/borehole" class="create-or-edit-link">Создать или изменить траекторию скважины</a>
+    </div>
+  </form>
 
-    
+  <script>
+    const mdInput = document.getElementById('md');
+    const mdValueOutput = document.getElementById('md_value');
+    const form = document.getElementById('logging-form');
+    const submitBtn = document.getElementById('submit-btn');
 
-    <script>
-        const mdInput = document.getElementById('md');
-        const mdValueOutput = document.getElementById('md_value');
+    mdInput.addEventListener('input', function () {
+      mdValueOutput.textContent = this.value;
+    });
 
-        mdInput.addEventListener('input', function() {
-            mdValueOutput.textContent = this.value;
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      submitBtn.disabled = true;
+
+      const formData = new FormData(form);
+
+      try {
+        const response = await fetch('/logging', {
+          method: 'POST',
+          body: formData,
         });
-    </script>
+
+        if (!response.ok) throw new Error('Ошибка при загрузке файла');
+
+        const blob = await response.blob();
+        const filename = response.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, '') || "logfile.bin";
+        
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        window.URL.revokeObjectURL(link.href);
+      } catch (err) {
+        alert("Произошла ошибка: " + err.message);
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
 </body>
 </html>
